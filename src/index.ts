@@ -1,20 +1,28 @@
-import { Hono } from 'hono/tiny'
+import { Hono, type Next, type Context } from 'hono'
 import { cache } from 'hono/cache'
 import { sha256 } from 'hono/utils/crypto'
-import { basicAuth } from 'hono/basic-auth'
 import { getExtension } from 'hono/utils/mime'
+import { basicAuth } from 'hono/basic-auth'
 import * as z from 'zod'
+import { homepageHtml } from './html'
 
 const maxAge = 60 * 60 * 24 * 30
 
 const app = new Hono<{ Bindings: Cloudflare.Env }>()
 
-app.put('/upload', async (c, next) => {
-  const auth = basicAuth({ username: c.env.USER, password: c.env.PASS })
+async function authMiddleware(c: Context<{ Bindings: Cloudflare.Env }>, next: Next) {
+  const auth = basicAuth({
+    username: c.env.USER,
+    password: c.env.PASS,
+  })
   await auth(c, next)
+}
+
+app.get('/', authMiddleware, (c) => {
+  return c.html(homepageHtml)
 })
 
-app.put('/upload', async (c) => {
+app.put('/upload', authMiddleware, async (c) => {
   const data = await c.req.parseBody<{ image: File; width: string; height: string }>()
 
   const body = data.image
