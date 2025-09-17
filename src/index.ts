@@ -1,6 +1,6 @@
 import { Hono, type Next, type Context } from 'hono'
 import { cache } from 'hono/cache'
-import { sha256 } from 'hono/utils/crypto'
+import { sha256, md5 } from 'hono/utils/crypto'
 import { getExtension } from 'hono/utils/mime'
 import { basicAuth } from 'hono/basic-auth'
 import * as z from 'zod'
@@ -39,7 +39,7 @@ app.put('/upload', authMiddleware, async (c) => {
 
   await c.env.BUCKET.put(key, body, { httpMetadata: { contentType: type } })
 
-  return c.text(key)
+  return c.text(await hashFilename(key, c.env.SECURITY_KEY))
 })
 
 app.get(
@@ -70,7 +70,12 @@ const getPreferredContentType = (acceptHeader: string | undefined, fallback: str
 app.get('/:key', async (c) => {
   const key = c.req.param('key')
 
-  const object = await c.env.BUCKET.get(key)
+  const filename = await checkKey(key, c.env.SECURITY_KEY)
+  if (!filename) {
+    return c.notFound()
+  }
+
+  const object = await c.env.BUCKET.get(filename)
   if (!object) return c.notFound()
   const contentType = object.httpMetadata?.contentType ?? ''
 
@@ -96,5 +101,31 @@ app.get('/:key', async (c) => {
     'Content-Type': contentType
   })
 })
+
+/**
+ * Generates a short, unique, and non-guessable key for the public URL.
+ * This is to prevent people from guessing the filename of the uploaded images.
+ * @param filename The original filename of the image.
+ * @param securityKey A secret key to use for hashing.
+ * @returns A hashed key for the image.
+ */
+async function hashFilename(filename: string, securityKey: string) {
+  return (await md5(securityKey + filename))?.substring(0, 8) + filename
+}
+
+/**
+ * Checks if the provided key is valid.
+ * @param key The key from the URL.
+ * @param securityKey A secret key to use for hashing.
+ * @returns The original filename if the key is valid, otherwise false.
+ */
+async function checkKey(key: string, securityKey: string) {
+  const filename = key.substring(8)
+  const hash = await hashFilename(filename, securityKey)
+  if (hash !== key) {
+    return false
+  }
+  return filename
+}
 
 export default app
