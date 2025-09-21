@@ -1,0 +1,16 @@
+name = "imagehosting"
+compatibility_date = "2025-08-09"
+assets.directory = "./public"
+workers_dev = false
+
+[vars]
+USER = ""
+PASS = ""
+SECURITY_KEY = ""
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "imagehosting"
+
+[images]
+binding = "IMAGES"
