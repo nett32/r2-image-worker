@@ -1,6 +1,6 @@
 name = "imagehosting"
 compatibility_date = "2025-08-09"
-assets.directory = "./public"
+# assets.directory = "./public"
 workers_dev = false
 
 [vars]
